@@ -1,0 +1,7 @@
+.venv/
+sessions/
+*.ini
+*.jpg
+*.pdf
+*.zip
+*.env
