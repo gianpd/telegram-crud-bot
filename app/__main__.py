@@ -20,6 +20,10 @@ from telethon import Button
 from telethon.sync import TelegramClient, events
 
 
+from tortoise import run_async
+from db import db
+
+
 WORK_IN_PROGRESS = 'WIP'
 TODAY = datetime.today().strftime('%Y%m%d')
 actions = ['GET', 'UPDATE', 'INSERT', 'DELETE']
@@ -29,7 +33,7 @@ buttons_actions = [Button.inline(x) for x in actions]
 API_ID = config['Telegram']['API_ID']
 API_HASH = config['Telegram']['API_HASH']
 BOT_TOKEN = config['Telegram']['BOT_TOKEN']
-session_name = 'sessions/Bot'
+session_name = './sessions/Bot'
 client = TelegramClient(session_name, API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 @client.on(events.NewMessage(pattern="(?i)/start"))
@@ -40,22 +44,28 @@ async def start(event):
         "I can perform CRUD operation for you!\n"+\
         "You can add/update/get/delete rows from two tables:\n"+\
         "\"<b>Clients</b>\n"+\
-        "\"<b>Orders</b>\n"+\
-        "Make your choice!"
+        "\"<b>Orders</b>\n"
     await client.send_message(
         SENDER, 
         text,
-        parse_mode="HTML",
-        buttons=[
-            Button.inline('Clients'),
-            Button.inline('Orders')
-        ])
+        parse_mode="HTML")
     
 @client.on(events.NewMessage(pattern="(?i)/clear"))
 async def clear(event):
     await start(event)
 
-@client.on(events.CallbackQuery(data=b'Orders'))
+
+@client.on(events.NewMessage(pattern="(?i)/insert_client"))
+async def insert(event):
+    sender = await event.get_sender()
+    SENDER = sender.id
+    txt = event.message.text.split(' ')
+    row = {'full_name': txt[1], 'company': txt[2], 'address': txt[3]}
+    # run_async(db.crud.post(row))
+    r = await db.run_insert(row)
+    print(f'Response {r}')
+
+@client.on(events.CallbackQuery(data=b'ORDER'))
 async def handlerStart(event):
     sender = await event.get_sender()
     SENDER = sender.id
@@ -64,49 +74,18 @@ async def handlerStart(event):
 
 
     
-@client.on(events.CallbackQuery(data=b'Clients'))
+@client.on(events.CallbackQuery(data=b'CLIENT'))
 async def handlerStart(event):
     sender = await event.get_sender()
     SENDER = sender.id
     await client.send_message(SENDER, 'Which actions can you perform?', 
                         buttons=buttons_actions)
-    @client.on(events.CallbackQuery(data=b'GET'))
-    async def handlerGet(event):
-        sender = await event.get_sender()
-        SENDER = sender.id
-        await client.send_message(
-                SENDER,
-                'GET METHOD'
-            )
-    @client.on(events.CallbackQuery(data=b'UPDATE'))
-    async def handlerGet(event):
-        sender = await event.get_sender()
-        SENDER = sender.id
-        await client.send_message(
-                SENDER,
-                'GET METHOD'
-            )
-    @client.on(events.CallbackQuery(data=b'DELETE'))
-    async def handlerGet(event):
-        sender = await event.get_sender()
-        SENDER = sender.id
-        await client.send_message(
-                SENDER,
-                'GET METHOD'
-            )
-    @client.on(events.CallbackQuery(data=b'INSERT'))
-    async def handlerGet(event):
-        sender = await event.get_sender()
-        SENDER = sender.id
-        await client.send_message(
-                SENDER,
-                'GET METHOD'
-            )
+    
+        ### build the row
+        
+        #run_async(db.crud.post())
     
 
 
 if __name__ == '__main__':
-    print(client.is_connected())
-    print(client.get_me())
-    print(client.is_bot())
     client.run_until_disconnected()

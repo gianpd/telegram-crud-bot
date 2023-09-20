@@ -1,5 +1,6 @@
 .venv/
 sessions/
+__pycache__/
 *.ini
 *.jpg
 *.pdf
