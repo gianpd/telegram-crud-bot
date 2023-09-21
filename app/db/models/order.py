@@ -1,27 +1,24 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Table
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from ..common.base import _base
 
-association_table = Table(
-    'association_client_order', _base.metadata,
-    Column('client_id', Integer, ForeignKey('client.id')),
-    Column('order_id', Integer, ForeignKey('order.id'))
-)
 
 class Order(_base):
+    """One-to-Many Customer-Orders Data model"""
     __tablename__ = 'order'
 
     id = Column(Integer, primary_key=True)
-    order_number = Column(String)
-    product_name = Column(String)
+    customer_id = Column(Integer, ForeignKey('customer.id')) # SQL relathionship
+    order_number = Column(String(255), unique=True)
+    product_name = Column(String(255))
     quantity = Column(Integer)
-    time_created = Column(DateTime, server_default=func.now())
-    clients = relationship('Client', secondary=association_table)
+    last_seen = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
 
-    def __init__(self, order_number, product_name, quantity, clients):
-        self.order_number = order_number
-        self.product_name = product_name
-        self.quantity = quantity
-        self.clients = clients
+    customer = relationship("Customer") # App models relathionship
+
+    def __repr__(self):
+        return f"<Order {self.order_number}>"
