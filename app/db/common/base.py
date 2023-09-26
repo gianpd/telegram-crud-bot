@@ -1,13 +1,13 @@
 import os
-
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+class Base(DeclarativeBase):
+    pass
 
 engine = create_engine(os.environ.get('DATABASE_URL'))
-_sessionFactory = sessionmaker(bind=engine)
-_base = declarative_base()
+Base.metadata.create_all(engine)
+_sessionFactory = sessionmaker(engine)
 
 def get_session():
-    _base.metadata.create_all(engine)
     return _sessionFactory()

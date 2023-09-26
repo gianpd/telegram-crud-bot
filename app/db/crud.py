@@ -8,17 +8,15 @@ logger = logging.getLogger('TGCRUD-logger')
 from uuid import uuid4
 from datetime import date
 
-from .models.customer import Customer
-from .models.order import Order
+from .models import Customer, Order
 from .common.base import get_session
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
-
+from psycopg2.errors import UndefinedColumn
 from typing import List, Optional
 
 
-def create_customer(session: Session, customer: Customer) -> Optional[Customer]:
+def create_customer(customer: Customer) -> Optional[Customer]:
     """Create customer method: check if the customer is not already present in the DB.
        If not, create it and commit.
        
@@ -30,26 +28,33 @@ def create_customer(session: Session, customer: Customer) -> Optional[Customer]:
         - Optional[Customer]
     """
     try:
+        session = get_session()
         existing_customer = session.query(Customer)\
             .filter(Customer.customer_number == customer.customer_number).first()
         if not existing_customer:
             session.add(customer)
             session.commit()
             logger.info(f'Customer {customer.customer_number} created.')
-            return session.query(Customer).filter(Customer.customer_number==customer.customer_number).first()
+            response = session.query(Customer).filter(Customer.customer_number==customer.customer_number).first()
+            session.close()
+            return response
         else:
-            logger.info(f'Customer {customer.customer_number} already exists.')
-            return None
+            logger.info(f'Customer {existing_customer.customer_number} already exists.')
+            session.close()
+            return existing_customer.id
     except IntegrityError as e:
         logger.error(e.orig)
         raise e.orig
+    except UndefinedColumn as e:
+        logger.error(e)
+        raise e
     except SQLAlchemyError as e:
         logger.error(f'Unexpected error when creating customer: {e}')
         raise e
     
 
     
-def create_order(session: Session, order: Order) -> Optional[Order]:
+def create_order(order: Order) -> Optional[Order]:
     """Create order method: check if the given order is not already present in the DB.
        If not, create it and commit.
        
@@ -60,28 +65,39 @@ def create_order(session: Session, order: Order) -> Optional[Order]:
        --Return
         - Optional[Order]
     """
-    try:
-        existing_order = session.query(Order)\
-            .filter(Order.order_number == order.order_number).first()
-        if not existing_order:
-            session.add(order)
-            session.commit()
-            logger.info(f'Order {order.order_number} created.')
-        else:
-            logger.info(f'Order {order.order_number} already exists.')
-        return session.query(Order).filter(Order.order_number==order.order_number).first()
-    except IntegrityError as e:
-        logger.error(e.orig)
-        raise e.orig
-    except SQLAlchemyError as e:
-        logger.error(f'Unexpected error when creating order: {e}')
-        raise e
+    # try:
+    session = get_session()
+    logger.info(f'create_order> {order.__dict__}')
+    r = session.query(Order).all()
+    logger.info(r)
+    #     existing_order = session.query(Order)\
+    #         .filter(Order.order_number == order.order_number).first()
+    #     if not existing_order:
+    #         session.add(order)
+    #         session.commit()
+    #         logger.info(f'Order {order.order_number} created.')
+    #     else:
+    #         logger.info(f'Order {order.order_number} already exists.')
+    #     response = session.query(Order).filter(Order.order_number==order.order_number).first()
+    #     session.close()
+    #     return response
+    # except IntegrityError as e:
+    #     logger.error(e.orig)
+    #     raise e.orig
+    # except UndefinedColumn as e:
+    #     logger.error(e)
+    #     raise e
+    # except SQLAlchemyError as e:
+    #     logger.error(f'Unexpected error when creating order: {e}')
+    #     raise e
 
-def get_all_customers(session: Session):
+def get_all_customers():
     """Fetch all customers"""
+    session = get_session()
     customers = (
         session.query(Customer).all()
     )
+    session.close()
     for customer in customers:
         payload = {
             "customer_number": customer.customer_number,
@@ -92,16 +108,16 @@ def get_all_customers(session: Session):
         }
         yield payload
 
-def get_all_orders(session: Session, customer: Customer):
+def get_all_orders(customer: Customer):
     """Fetch all orders belonging to the given customer"""
-
+    session = get_session()
     orders = (
         session.query(Order)\
             .join(Customer, Order.customer_id==customer.id)\
             .filter(customer_number=customer.customer_number)\
             .all() 
     )
-
+    session.close()
     for order in orders:
         payload = {
             "order_number": order.order_number,
